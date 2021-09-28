@@ -12,7 +12,6 @@ import java.time.Duration
 import java.util.concurrent.Executor
 import java.util.function.Supplier
 
-
 /**
  *
  * Contains the configuration necessary to connect to a database.
@@ -31,7 +30,7 @@ import java.util.function.Supplier
  *                           change it.
  * @param allocator the netty buffer allocator to be used
  * @param connectionTimeout the timeout for connecting to servers in millis
- * @param queryTimeout the optional query timeout
+ * @param queryTimeout the optional query timeout. If it's null there will be no query timeout at all
  * @param applicationName optional name to be passed to the database for reporting
  * @param interceptors optional delegates to call on query execution
  * @param executionContext the thread pool to run the callbacks on
@@ -56,3 +55,7 @@ data class Configuration @JvmOverloads constructor(
     val eventLoopGroup: EventLoopGroup = NettyUtils.DefaultEventLoopGroup,
     val executionContext: Executor = ExecutorServiceUtils.CommonPool
 )
+
+fun Configuration.toDebugString(): String {
+    return this.copy(password = "****").toString()
+}

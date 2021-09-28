@@ -2,7 +2,6 @@ package com.github.jasync.sql.db.mysql.message.client
 
 import com.github.jasync.sql.db.KindedMessage
 
-
 open class ClientMessage(override val kind: Int) : KindedMessage {
     companion object {
         const val ClientProtocolVersion = 0x09 // COM_STATISTICS
@@ -12,6 +11,7 @@ open class ClientMessage(override val kind: Int) : KindedMessage {
         const val PreparedStatementExecute = 0x17 // COM_STMT_EXECUTE
         const val PreparedStatementSendLongData = 0x18 // COM_STMT_SEND_LONG_DATA
         const val PreparedStatementClose = 0x19 // COM_STMT_CLOSE
+        const val SslRequest = 0xfd // SSLRequest
         const val AuthSwitchResponse = 0xfe // AuthSwitchRequest
     }
 }

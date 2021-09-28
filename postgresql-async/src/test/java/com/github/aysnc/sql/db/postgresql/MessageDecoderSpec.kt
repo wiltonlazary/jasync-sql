@@ -13,14 +13,12 @@ import io.netty.util.CharsetUtil
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-
 class MessageDecoderSpec {
 
     val decoder = MessageDecoder(false, CharsetUtil.UTF_8)
 
-
     @Test
-    fun `"message decoder" should "not try to decode if there is not enought data available"`() {
+    fun `message decoder should not try to decode if there is not enough data available`() {
 
         val buffer = Unpooled.buffer()
 
@@ -34,7 +32,7 @@ class MessageDecoderSpec {
     }
 
     @Test
-    fun `"should not try to decode if there is a type and lenght but it's not long enough"`() {
+    fun `should not try to decode if there is a type and length but it is not long enough`() {
 
         val buffer = Unpooled.buffer()
 
@@ -48,7 +46,7 @@ class MessageDecoderSpec {
     }
 
     @Test
-    fun `"should correctly decode a message"`() {
+    fun `should correctly decode a message`() {
 
         val buffer = Unpooled.buffer()
         val text = "This is an error message"
@@ -68,7 +66,7 @@ class MessageDecoderSpec {
     }
 
     @Test(expected = NegativeMessageSizeException::class)
-    fun `"should raise an exception if the length is negative"`() {
+    fun `should raise an exception if the length is negative`() {
         val buffer = Unpooled.buffer()
         buffer.writeByte(ServerMessage.Close)
         buffer.writeInt(2)
@@ -78,7 +76,7 @@ class MessageDecoderSpec {
     }
 
     @Test(expected = MessageTooLongException::class)
-    fun `"should raise an exception if the length is too big"`() {
+    fun `should raise an exception if the length is too big`() {
 
         val buffer = Unpooled.buffer()
         buffer.writeByte(ServerMessage.Close)
@@ -87,7 +85,4 @@ class MessageDecoderSpec {
 
         this.decoder.decode(mockk(), buffer, out)
     }
-
 }
-
-

@@ -6,26 +6,24 @@ import com.github.jasync.sql.db.postgresql.exceptions.GenericDatabaseException
 import com.github.jasync.sql.db.util.ExecutorServiceUtils
 import com.github.jasync.sql.db.util.flatMapAsync
 import com.github.jasync.sql.db.util.length
+import java.util.concurrent.ExecutionException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import java.util.concurrent.ExecutionException
-
 
 class TransactionSpec : DatabaseTestHelper() {
 
+    private val tableCreate = "CREATE TEMP TABLE transaction_test (x integer PRIMARY KEY)"
 
-    val tableCreate = "CREATE TEMP TABLE transaction_test (x integer PRIMARY KEY)"
+    private fun tableInsert(x: Int) = "INSERT INTO transaction_test VALUES ($x)"
 
-    fun tableInsert(x: Int) = "INSERT INTO transaction_test VALUES (" + x.toString() + ")"
-
-    val tableSelect = "SELECT x FROM transaction_test ORDER BY x"
+    private val tableSelect = "SELECT x FROM transaction_test ORDER BY x"
 
     @Test
-    fun `"transactions" should "commit simple inserts"`() {
+    fun `transactions should commit simple inserts`() {
         withHandler { handler ->
             executeDdl(handler, tableCreate)
             awaitFuture(handler.inTransaction { conn ->
-                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
+                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
                     conn.sendQuery(tableInsert(2))
                 }
             })
@@ -38,11 +36,11 @@ class TransactionSpec : DatabaseTestHelper() {
     }
 
     @Test
-    fun `"transactions" should "commit simple inserts , prepared statements"`() {
+    fun `transactions should commit simple inserts, prepared statements`() {
         withHandler { handler ->
             executeDdl(handler, tableCreate)
             awaitFuture(handler.inTransaction { conn ->
-                conn.sendPreparedStatement(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
+                conn.sendPreparedStatement(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
                     conn.sendPreparedStatement(tableInsert(2))
                 }
             })
@@ -55,14 +53,14 @@ class TransactionSpec : DatabaseTestHelper() {
     }
 
     @Test
-    fun `"transactions" should "rollback on error"`() {
+    fun `transactions should rollback on error`() {
         withHandler { handler ->
             executeDdl(handler, tableCreate)
 
             val e: GenericDatabaseException =
                 verifyException(ExecutionException::class.java, GenericDatabaseException::class.java) {
                     awaitFuture(handler.inTransaction { conn ->
-                        conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
+                        conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
                             conn.sendQuery(tableInsert(1))
                         }
                     })
@@ -70,19 +68,17 @@ class TransactionSpec : DatabaseTestHelper() {
 
             assertThat(e.errorMessage.message).isEqualTo("duplicate key value violates unique constraint \"transaction_test_pkey\"")
 
-
             val rows = executeQuery(handler, tableSelect).rows
             assertThat(rows.length).isEqualTo(0)
         }
-
     }
 
     @Test
-    fun `"transactions" should "rollback explicitly"`() {
+    fun `transactions should rollback explicitly`() {
         withHandler { handler ->
             executeDdl(handler, tableCreate)
             awaitFuture(handler.inTransaction { conn ->
-                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
+                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
                     conn.sendQuery("ROLLBACK")
                 }
             })
@@ -90,17 +86,16 @@ class TransactionSpec : DatabaseTestHelper() {
             val rows = executeQuery(handler, tableSelect).rows
             assertThat(rows.length).isEqualTo(0)
         }
-
     }
 
     @Test
-    fun `"transactions" should "rollback to savepoint"`() {
+    fun `transactions should rollback to savepoint`() {
         withHandler { handler ->
             executeDdl(handler, tableCreate)
             awaitFuture(handler.inTransaction { conn ->
-                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
-                    conn.sendQuery("SAVEPOINT one").flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
-                        conn.sendQuery(tableInsert(2)).flatMapAsync(ExecutorServiceUtils.CommonPool) { _ ->
+                conn.sendQuery(tableInsert(1)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
+                    conn.sendQuery("SAVEPOINT one").flatMapAsync(ExecutorServiceUtils.CommonPool) {
+                        conn.sendQuery(tableInsert(2)).flatMapAsync(ExecutorServiceUtils.CommonPool) {
                             conn.sendQuery("ROLLBACK TO SAVEPOINT one")
                         }
                     }
@@ -111,8 +106,5 @@ class TransactionSpec : DatabaseTestHelper() {
             assertThat(rows.length).isEqualTo(1)
             assertThat(rows[0](0)).isEqualTo(1)
         }
-
     }
-
-
 }

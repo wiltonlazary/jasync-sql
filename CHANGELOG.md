@@ -1,5 +1,96 @@
 # Changelog
 
+## 2.0.0
+
+* Switch to Java Date/Time API from Joda Time [#233](https://github.com/jasync-sql/jasync-sql/pull/233)
+* For postgresql, add support for threeten.PeriodDuration for interval data type. [#233](https://github.com/jasync-sql/jasync-sql/pull/233)
+
+## 1.2.3
+
+* Enable CLIENT_FOUND_ROWS in r2dbc-mysql in favor of spring-data-r2dbc [#240](https://github.com/jasync-sql/jasync-sql/pull/240).
+* Fix SSL Connection to MySQL [#237](https://github.com/jasync-sql/jasync-sql/pull/237).
+* Add explicit dependency on kotlin-reflect.
+
+## 1.2.1
+
+* Deploy directly to maven central [#232](https://github.com/jasync-sql/jasync-sql/pull/232).
+
+## 1.1.7
+
+* Support SSL for MySQL [#222](https://github.com/jasync-sql/jasync-sql/pull/222).
+* Query timeout is not respected when host is not listening [#223](https://github.com/jasync-sql/jasync-sql/pull/223).
+* PostgreSQLConnectionFactory logs eintire db configuration including password [#226](https://github.com/jasync-sql/jasync-sql/pull/226).
+
+## 1.1.6
+
+* Add scram-sha-256 authentication (via SASL) to the PostgreSQL client [#219](https://github.com/jasync-sql/jasync-sql/pull/219).
+* Upgrade to Kotlin 1.4.20 [#216](https://github.com/jasync-sql/jasync-sql/pull/216).
+
+## 1.1.5
+
+* Add client SSL configuration [#214](https://github.com/jasync-sql/jasync-sql/pull/214).
+
+## 1.1.3
+
+* Convert Gradle to Kotlin script: https://github.com/jasync-sql/jasync-sql/pull/201.
+* Apply ktlint on build and fix errors: https://github.com/jasync-sql/jasync-sql/pull/204.
+* Prevent false leak detection in tests: https://github.com/jasync-sql/jasync-sql/pull/203.
+
+## 1.1.1,1.1.2
+
+* Test versions for https://github.com/jasync-sql/jasync-sql/pull/201.
+
+## 1.1.0
+
+* Add and artifact for the object pool: https://github.com/jasync-sql/jasync-sql/issues/198.
+
+## 1.0.19
+
+* Same as `1.0.18`.
+
+## 1.0.18
+
+* Remove sensitive info from log: https://github.com/jasync-sql/jasync-sql/pull/199.
+
+## 1.0.17
+
+* Add r2dbc query timeout - https://github.com/jasync-sql/jasync-sql/issues/193.
+* Allow to bypass query interceptors for test queries - https://github.com/jasync-sql/jasync-sql/issues/188.
+
+## 1.0.16
+
+Corrupted version.
+
+## 1.0.15
+
+* Update netty to `4.1.49.Final` - https://github.com/jasync-sql/jasync-sql/pull/191.
+
+## 1.0.14
+
+* Fix collisions between Prepared Statements in postgres - https://github.com/jasync-sql/jasync-sql/pull/179.
+
+## 1.0.13
+
+* Fix - SuspendingConnection.inTransaction is running on multiple connections [#177](https://github.com/jasync-sql/jasync-sql/issues/177).
+
+## 1.0.12
+
+* R2DBC - upgrade to 0.8 release version https://github.com/jasync-sql/jasync-sql/issues/169
+* Kotlin - upgrade to 1.3.61
+* Coroutines - upgrade to 1.3.2
+
+## 1.0.11
+
+* R2DBC - Fix a bug that connection factory validation alsways returned false https://github.com/jasync-sql/jasync-sql/issues/161
+
+## 1.0.10
+
+* Fix a bug that when result of query start with empty value there is an exception https://github.com/jasync-sql/jasync-sql/issues/160
+
+## 1.0.9
+
+* Upgrade R2DBC to 0.8.0.RC2, see https://github.com/jasync-sql/jasync-sql/issues/152 and https://github.com/jasync-sql/jasync-sql/issues/159
+
 ## 1.0.7
 
 * R2DBC - IllegalStateException: unmatched requested type Object on get("id", Object.class) and Integer-typed value: https://github.com/jasync-sql/jasync-sql/issues/150

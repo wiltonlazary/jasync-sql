@@ -4,6 +4,7 @@ import com.github.jasync.sql.db.Configuration
 import com.github.jasync.sql.db.Connection
 import com.github.jasync.sql.db.ConnectionPoolConfiguration
 import com.github.jasync.sql.db.QueryResult
+import com.github.jasync.sql.db.SSLConfiguration
 import com.github.jasync.sql.db.mysql.pool.MySQLConnectionFactory
 import com.github.jasync.sql.db.pool.ConnectionPool
 import java.util.concurrent.CompletableFuture
@@ -14,7 +15,6 @@ import java.util.concurrent.TimeUnit
  * @author Doug Chimento dchimento@outbrain.com
  */
 open class ConnectionHelper : ContainerHelper() {
-
 
     val createTableNumericColumns =
         """
@@ -66,8 +66,8 @@ open class ConnectionHelper : ContainerHelper() {
         """CREATE TEMPORARY TABLE posts (
        id INT NOT NULL AUTO_INCREMENT,
        created_at_date DATE not null,
-       created_at_datetime DATETIME not null,
-       created_at_timestamp TIMESTAMP not null,
+       created_at_datetime DATETIME(6) not null,
+       created_at_timestamp TIMESTAMP(6) not null,
        created_at_time TIME not null,
        created_at_year YEAR not null,
        primary key (id)
@@ -90,7 +90,7 @@ open class ConnectionHelper : ContainerHelper() {
     }
 
     fun <T> awaitFuture(f: CompletableFuture<T>): T {
-        return f.get(5, TimeUnit.SECONDS)
+        return f.get(10, TimeUnit.SECONDS)
     }
 
     fun <T> withPool(f: (ConnectionPool<MySQLConnection>) -> T): T {
@@ -129,6 +129,18 @@ open class ConnectionHelper : ContainerHelper() {
         return withConfigurableConnection(ContainerHelper.defaultConfiguration, fn)
     }
 
+    fun <T> withSSLConnection(
+        host: String = "localhost",
+        sslConfig: SSLConfiguration,
+        fn: (MySQLConnection) -> T
+    ): T {
+        val config = defaultConfiguration.copy(
+            host = host,
+            ssl = sslConfig
+        )
+        return withConfigurableConnection(config, fn)
+    }
+
     fun <T> withConfigurableConnection(configuration: Configuration, fn: (MySQLConnection) -> T): T {
         val connection = MySQLConnection(configuration)
 
@@ -159,5 +171,4 @@ open class ConnectionHelper : ContainerHelper() {
     fun releasePreparedStatement(handler: MySQLConnection, query: String): Boolean {
         return awaitFuture(handler.releasePreparedStatement(query))
     }
-
 }

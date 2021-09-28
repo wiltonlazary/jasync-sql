@@ -7,9 +7,7 @@ import com.github.jasync.sql.db.postgresql.PostgreSQLConnectionBuilder
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-
 class PostgreSQLPoolConfigurationSpec : DatabaseTestHelper() {
-
 
     val create = """create temp table type_test_table (
             bigserial_column bigserial not null,
@@ -26,15 +24,14 @@ class PostgreSQLPoolConfigurationSpec : DatabaseTestHelper() {
             time_column time,
             boolean_column boolean,
             constraint bigserial_column_pkey primary key (bigserial_column)
-          ) with oids"""
+          )"""
 
     @Test
-    fun `"handler" should     "create a table in the database" with connection pool`() {
+    fun `handler should create a table in the database with connection pool`() {
 
         withPoolConfigurationConnectionConnection { handler ->
             assertThat(executeDdl(handler, this.create)).isEqualTo(0)
         }
-
     }
 
     private fun <T> withPoolConfigurationConnectionConnection(fn: (Connection) -> T): T {
@@ -56,12 +53,11 @@ class PostgreSQLPoolConfigurationSpec : DatabaseTestHelper() {
     }
 
     @Test
-    fun `"handler" should     "create a table in the database" with connection pool builder`() {
+    fun `handler should create a table in the database with connection pool builder`() {
 
         withPoolConfigurationConnectionBuilderConnection { handler ->
             assertThat(executeDdl(handler, this.create)).isEqualTo(0)
         }
-
     }
 
     private fun <T> withPoolConfigurationConnectionBuilderConnection(fn: (Connection) -> T): T {
@@ -81,12 +77,11 @@ class PostgreSQLPoolConfigurationSpec : DatabaseTestHelper() {
     }
 
     @Test
-    fun `"handler" should     "create a table in the database" with connection pool parsed from url`() {
+    fun `handler should create a table in the database with connection pool parsed from url`() {
 
         withPoolUrlConfigurationConnection { handler ->
             assertThat(executeDdl(handler, this.create)).isEqualTo(0)
         }
-
     }
 
     private fun <T> withPoolUrlConfigurationConnection(fn: (Connection) -> T): T {
@@ -104,5 +99,4 @@ class PostgreSQLPoolConfigurationSpec : DatabaseTestHelper() {
             awaitFuture(connection.disconnect())
         }
     }
-
 }

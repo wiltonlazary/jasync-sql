@@ -5,6 +5,7 @@ import com.github.jasync.sql.db.exceptions.DatabaseException
 import com.github.jasync.sql.db.general.MutableResultSet
 import com.github.jasync.sql.db.mysql.binary.BinaryRowDecoder
 import com.github.jasync.sql.db.mysql.message.client.AuthenticationSwitchResponse
+import com.github.jasync.sql.db.mysql.message.client.CapabilityRequestMessage
 import com.github.jasync.sql.db.mysql.message.client.CloseStatementMessage
 import com.github.jasync.sql.db.mysql.message.client.HandshakeResponseMessage
 import com.github.jasync.sql.db.mysql.message.client.PreparedStatementExecuteMessage
@@ -37,7 +38,6 @@ import com.github.jasync.sql.db.util.tail
 import com.github.jasync.sql.db.util.toCompletableFuture
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelFuture
@@ -47,11 +47,11 @@ import io.netty.channel.ChannelOption
 import io.netty.channel.EventLoopGroup
 import io.netty.channel.SimpleChannelInboundHandler
 import io.netty.handler.codec.CodecException
-import mu.KotlinLogging
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
+import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
@@ -92,11 +92,10 @@ class MySQLConnectionHandler(
                     this@MySQLConnectionHandler
                 )
             }
-
         })
 
         this.bootstrap.option(ChannelOption.SO_KEEPALIVE, true)
-        this.bootstrap.option<ByteBufAllocator>(ChannelOption.ALLOCATOR, LittleEndianByteBufAllocator.INSTANCE)
+        this.bootstrap.option(ChannelOption.ALLOCATOR, LittleEndianByteBufAllocator.INSTANCE)
         this.bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, this.configuration.connectionTimeout)
 
         val channelFuture: ChannelFuture =
@@ -185,14 +184,12 @@ class MySQLConnectionHandler(
                 }
             }
         }
-
     }
 
     override fun channelActive(ctx: ChannelHandlerContext) {
         logger.trace { "[connectionId:$connectionId] - Channel became active" }
         handlerDelegate.connected(ctx)
     }
-
 
     override fun channelInactive(ctx: ChannelHandlerContext) {
         logger.trace { "[connectionId:$connectionId] - Channel became inactive" }
@@ -216,7 +213,6 @@ class MySQLConnectionHandler(
             is CodecException -> handleException(cause.cause ?: cause)
             else -> handleException(cause)
         }
-
     }
 
     private fun handleException(cause: Throwable) {
@@ -266,9 +262,9 @@ class MySQLConnectionHandler(
         }
     }
 
-    fun closePreparedStatement(query : String): CompletableFuture<Boolean> {
+    fun closePreparedStatement(query: String): CompletableFuture<Boolean> {
         val statement = this.parsedStatements[query]
-        return if(statement != null) {
+        return if (statement != null) {
             this.parsedStatements.remove(query)
             this.writeAndHandleError(CloseStatementMessage(statement.statementId()))
             FP.successful(true)
@@ -276,6 +272,8 @@ class MySQLConnectionHandler(
             FP.successful(false)
         }
     }
+
+    fun write(message: CapabilityRequestMessage): ChannelFuture = writeAndHandleError(message)
 
     fun write(message: HandshakeResponseMessage): ChannelFuture {
         decoder.hasDoneHandshake = true
@@ -297,7 +295,6 @@ class MySQLConnectionHandler(
         }
         return future
     }
-
 
     fun closeChannel(): ChannelFuture {
         return this.currentContext!!.channel().close()
@@ -448,5 +445,4 @@ class MySQLConnectionHandler(
             }
         }
     }
-
 }

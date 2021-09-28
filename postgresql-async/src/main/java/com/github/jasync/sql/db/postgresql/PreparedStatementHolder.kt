@@ -1,8 +1,9 @@
 package com.github.jasync.sql.db.postgresql
 
 import com.github.jasync.sql.db.postgresql.messages.backend.PostgreSQLColumnData
+import java.util.UUID
 
-class PreparedStatementHolder(val query: String, val statementId: Int) {
+class PreparedStatementHolder(val query: String, val statementId: UUID = UUID.randomUUID()) {
 
     val realQuery: String get() = pair.first
     val paramsCount: Int get() = pair.second
@@ -34,5 +35,4 @@ class PreparedStatementHolder(val query: String, val statementId: Int) {
 
     var prepared: Boolean = false
     var columnDatas: List<PostgreSQLColumnData> = emptyList()
-
 }

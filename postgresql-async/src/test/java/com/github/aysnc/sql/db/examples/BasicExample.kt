@@ -11,10 +11,9 @@ import com.github.jasync.sql.db.util.mapAsync
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-fun main(args: Array<String>) {
-
+fun main() {
     val configuration =
-        URLParser.parse("jdbc:postgresql://localhost:5432/my_database?username=postgres&password=mysecretpassword")
+        URLParser.parse("jdbc:postgresql://localhost:5432/my_database?user=postgres&password=mysecretpassword")
     val connection: Connection = PostgreSQLConnection(configuration)
 
     connection.connect().get(5, TimeUnit.SECONDS)
@@ -28,13 +27,9 @@ fun main(args: Array<String>) {
             row[0]
         }
 
-
     val result = mapResult.get(5, TimeUnit.SECONDS)
 
     println(result)
 
     connection.disconnect()
-
 }
-
-

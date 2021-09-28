@@ -6,6 +6,7 @@ import com.github.jasync.sql.db.Connection
 import com.github.jasync.sql.db.EMPTY_RESULT_SET
 import com.github.jasync.sql.db.QueryResult
 import com.github.jasync.sql.db.ResultSet
+import com.github.jasync.sql.db.SSLConfiguration
 import com.github.jasync.sql.db.exceptions.ConnectionStillRunningQueryException
 import com.github.jasync.sql.db.exceptions.DatabaseException
 import com.github.jasync.sql.db.exceptions.InsufficientParametersException
@@ -14,16 +15,19 @@ import com.github.jasync.sql.db.mysql.codec.MySQLConnectionHandler
 import com.github.jasync.sql.db.mysql.codec.MySQLHandlerDelegate
 import com.github.jasync.sql.db.mysql.exceptions.MySQLException
 import com.github.jasync.sql.db.mysql.message.client.AuthenticationSwitchResponse
+import com.github.jasync.sql.db.mysql.message.client.CapabilityRequestMessage
 import com.github.jasync.sql.db.mysql.message.client.HandshakeResponseMessage
 import com.github.jasync.sql.db.mysql.message.server.AuthenticationSwitchRequest
 import com.github.jasync.sql.db.mysql.message.server.EOFMessage
 import com.github.jasync.sql.db.mysql.message.server.ErrorMessage
 import com.github.jasync.sql.db.mysql.message.server.HandshakeMessage
 import com.github.jasync.sql.db.mysql.message.server.OkMessage
+import com.github.jasync.sql.db.mysql.util.CapabilityFlag
 import com.github.jasync.sql.db.mysql.util.CharsetMapper
 import com.github.jasync.sql.db.pool.TimeoutScheduler
 import com.github.jasync.sql.db.pool.TimeoutSchedulerImpl
 import com.github.jasync.sql.db.util.Failure
+import com.github.jasync.sql.db.util.NettyUtils
 import com.github.jasync.sql.db.util.Success
 import com.github.jasync.sql.db.util.Version
 import com.github.jasync.sql.db.util.complete
@@ -37,11 +41,12 @@ import com.github.jasync.sql.db.util.parseVersion
 import com.github.jasync.sql.db.util.success
 import com.github.jasync.sql.db.util.toCompletableFuture
 import io.netty.channel.ChannelHandlerContext
-import mu.KotlinLogging
-import java.util.*
+import io.netty.handler.ssl.SslHandler
+import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
@@ -56,6 +61,7 @@ class MySQLConnection @JvmOverloads constructor(
         @Suppress("unused")
         val MicrosecondsVersion = Version(5, 6, 0)
         private val regexForCallInQueryStart = Regex("\\s*call\\s+.*", RegexOption.IGNORE_CASE)
+        const val CLIENT_FOUND_ROWS_PROP_NAME = "jasync.mysql.CLIENT_FOUND_ROWS"
     }
 
     init {
@@ -63,7 +69,7 @@ class MySQLConnection @JvmOverloads constructor(
         charsetMapper.toInt(configuration.charset)
     }
 
-    private val connectionCount = MySQLConnection.Counter.incrementAndGet()
+    private val connectionCount = Counter.incrementAndGet()
     private val connectionId = "<mysql-connection-$connectionCount>"
     override val id: String = connectionId
 
@@ -85,6 +91,15 @@ class MySQLConnection @JvmOverloads constructor(
     private var connected = false
     private var lastException: Throwable? = null
     private var serverVersion: Version? = null
+
+    object StatusFlags {
+        // https://dev.mysql.com/doc/internals/en/status-flags.html
+        // private val IN_TRANSACTION: Int = 1
+        internal const val AUTO_COMMIT: Int = 2
+    }
+    private var serverStatus: Int = 0
+
+    fun isAutoCommit(): Boolean = (serverStatus and StatusFlags.AUTO_COMMIT) != 0
 
     private val timeoutSchedulerImpl =
         TimeoutSchedulerImpl(configuration.executionContext, configuration.eventLoopGroup, this::onTimeout)
@@ -183,6 +198,7 @@ class MySQLConnection @JvmOverloads constructor(
     }
 
     override fun onOk(message: OkMessage) {
+        this.serverStatus = message.statusFlags
         if (!this.connectionPromise.isCompleted) {
             logger.debug("$connectionId Connected to database")
             this.connectionPromise.success(this)
@@ -218,6 +234,7 @@ class MySQLConnection @JvmOverloads constructor(
 
     override fun onEOF(message: EOFMessage) {
         logger.debug { "$connectionId onEOF isStoredProcedureCall=$isStoredProcedureCall isQuerying=${isQuerying()}" }
+        this.serverStatus = message.flags
         if (this.isQuerying() && !isStoredProcedureCall) {
             this.succeedQueryPromise(
                 MySQLQueryResult(
@@ -233,18 +250,79 @@ class MySQLConnection @JvmOverloads constructor(
 
     override fun onHandshake(message: HandshakeMessage) {
         this.serverVersion = parseVersion(message.serverVersion)
+        this.serverStatus = message.statusFlags
 
-        this.connectionHandler.write(
-            HandshakeResponseMessage(
-                configuration.username,
-                configuration.charset,
-                message.seed,
-                message.authenticationMethod,
-                database = configuration.database,
-                password = configuration.password,
-                appName = configuration.applicationName
-            )
+        val switchToSsl = when (this.configuration.ssl.mode) {
+            SSLConfiguration.Mode.Disable -> false
+            SSLConfiguration.Mode.Prefer -> message.supportsSSL()
+            SSLConfiguration.Mode.Require,
+            SSLConfiguration.Mode.VerifyCA,
+            SSLConfiguration.Mode.VerifyFull -> {
+                require(message.supportsSSL()) { "SSL is not supported on server" }
+                true
+            }
+        }
+
+        val clientFoundRows = System.getProperty(CLIENT_FOUND_ROWS_PROP_NAME) != null
+        if (clientFoundRows) {
+            logger.debug { "CLIENT_FOUND_ROWS capability set" }
+        }
+
+        val capabilities = CapabilityRequestMessage(setOfNotNull(
+                CapabilityFlag.CLIENT_PLUGIN_AUTH,
+                CapabilityFlag.CLIENT_FOUND_ROWS.takeIf { clientFoundRows },
+                CapabilityFlag.CLIENT_PROTOCOL_41,
+                CapabilityFlag.CLIENT_TRANSACTIONS,
+                CapabilityFlag.CLIENT_MULTI_RESULTS,
+                CapabilityFlag.CLIENT_SECURE_CONNECTION,
+                CapabilityFlag.CLIENT_SSL.takeIf { switchToSsl },
+                CapabilityFlag.CLIENT_CONNECT_WITH_DB.takeIf { configuration.database != null },
+                CapabilityFlag.CLIENT_CONNECT_ATTRS.takeIf { configuration.applicationName != null }
+        ))
+
+        val handshakeResponse = HandshakeResponseMessage(
+            capabilities,
+            configuration.username,
+            configuration.charset,
+            message.seed,
+            message.authenticationMethod,
+            database = configuration.database,
+            password = configuration.password,
+            appName = configuration.applicationName
         )
+
+        if (!switchToSsl) {
+            connectionHandler.write(handshakeResponse)
+            return
+        }
+
+        val channelFuture = connectionHandler.write(capabilities)
+        channelFuture.addListener { sslRequestFuture ->
+            // connectionHandler.write will handle errors (logging, failing promise, etc) in this case.
+            if (!sslRequestFuture.isSuccess) return@addListener
+            val channel = channelFuture.channel()
+            val handler = try {
+                val sslContext = NettyUtils.createSslContext(configuration.ssl)
+                val sslEngine = sslContext.newEngine(channel.alloc(), configuration.host, configuration.port)
+                if (configuration.ssl.mode == SSLConfiguration.Mode.VerifyFull) {
+                    NettyUtils.verifyHostIdentity(sslEngine)
+                }
+                SslHandler(sslEngine)
+            } catch (e: Exception) {
+                logger.error(e) { "Creating SSL Engine failed" }
+                setException(e)
+                return@addListener
+            }
+            channel.pipeline().addFirst(handler)
+            handler.handshakeFuture().addListener { handshakeFuture ->
+                if (handshakeFuture.isSuccess) {
+                    connectionHandler.write(handshakeResponse)
+                } else {
+                    logger.error(handshakeFuture.cause()) { "SSL Handshake failed" }
+                    handshakeFuture.cause()?.let(::setException)
+                }
+            }
+        }
     }
 
     override fun switchAuthentication(message: AuthenticationSwitchRequest) {
@@ -269,11 +347,9 @@ class MySQLConnection @JvmOverloads constructor(
     }
 
     private fun succeedQueryPromise(queryResult: QueryResult) {
-
         this.clearQueryPromise().ifPresent {
             it.success(queryResult)
         }
-
     }
 
     override fun isQuerying(): Boolean = this.queryPromise().isPresent
@@ -365,6 +441,4 @@ class MySQLConnection @JvmOverloads constructor(
         }
         return currentPromise
     }
-
 }
-

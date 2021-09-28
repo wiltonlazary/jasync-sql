@@ -1,5 +1,6 @@
 package com.github.jasync.r2dbc.mysql
 
+import com.github.jasync.sql.db.Connection as JasyncConnection
 import com.github.jasync.sql.db.exceptions.ConnectionTimeoutedException
 import com.github.jasync.sql.db.exceptions.InsufficientParametersException
 import com.github.jasync.sql.db.mysql.MySQLQueryResult
@@ -10,14 +11,13 @@ import io.r2dbc.spi.R2dbcPermissionDeniedException
 import io.r2dbc.spi.R2dbcTimeoutException
 import io.r2dbc.spi.Result
 import io.r2dbc.spi.Statement
+import java.io.IOException
+import java.util.function.Supplier
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import reactor.core.publisher.onErrorMap
 import reactor.core.publisher.toFlux
 import reactor.core.publisher.toMono
-import java.io.IOException
-import java.util.function.Supplier
-import com.github.jasync.sql.db.Connection as JasyncConnection
 
 internal class JasyncStatement(private val clientSupplier: Supplier<JasyncConnection>, private val sql: String) :
     Statement {
@@ -51,12 +51,8 @@ internal class JasyncStatement(private val clientSupplier: Supplier<JasyncConnec
         return this
     }
 
-    override fun bind(identifier: Any, value: Any): Statement {
-        if (identifier is String) {
-            return bind(identifier.toInt(), value)
-        } else {
-            throw IllegalArgumentException("cant bind identifier $identifier with value '$value'")
-        }
+    override fun bind(identifier: String, value: Any): Statement {
+        return bind(identifier.toInt(), value)
     }
 
     override fun bind(index: Int, value: Any): Statement {
@@ -65,12 +61,8 @@ internal class JasyncStatement(private val clientSupplier: Supplier<JasyncConnec
         return this
     }
 
-    override fun bindNull(identifier: Any, type: Class<*>): Statement {
-        if (identifier is String) {
-            return bindNull(identifier.toInt(), type)
-        } else {
-            throw IllegalArgumentException("cant bind null identifier $identifier")
-        }
+    override fun bindNull(identifier: String, type: Class<*>): Statement {
+        return bindNull(identifier.toInt(), type)
     }
 
     override fun bindNull(index: Int, type: Class<*>): Statement {
@@ -142,7 +134,10 @@ internal class JasyncStatement(private val clientSupplier: Supplier<JasyncConnec
                             )
                         }
                     }
-                    is InsufficientParametersException -> R2dbcDataIntegrityViolationException(throwable.message, throwable)
+                    is InsufficientParametersException -> R2dbcDataIntegrityViolationException(
+                        throwable.message,
+                        throwable
+                    )
                     else -> R2dbcTimeoutException(throwable)
                 }
             }

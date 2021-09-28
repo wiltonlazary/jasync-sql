@@ -10,26 +10,29 @@ import java.io.File
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
-
 open class DatabaseTestHelper {
 
-    private val cotainerHelper = ContainerHelper
+    private val containerHelper = ContainerHelper
 
-    val conf = cotainerHelper.defaultConfiguration
+    val conf = containerHelper.defaultConfiguration
 
     fun <T> withHandler(fn: (PostgreSQLConnection) -> T): T {
-        return withHandler(cotainerHelper.defaultConfiguration, fn)
+        return withHandler(containerHelper.defaultConfiguration, fn)
     }
 
+    val defaultSslConfig = SSLConfiguration(
+        mode = SSLConfiguration.Mode.Require,
+        rootCert = File(ClassLoader.getSystemClassLoader().getResource("server.cert.txt").file)
+    )
+
     fun <T> withSSLHandler(
-        mode: SSLConfiguration.Mode,
         host: String = "localhost",
-        rootCert: File? = File(ClassLoader.getSystemClassLoader().getResource("server.cert.txt").file),
+        sslConfig: SSLConfiguration = defaultSslConfig,
         fn: (PostgreSQLConnection) -> T
     ): T {
-        val config = cotainerHelper.defaultConfiguration.copy(
+        val config = containerHelper.defaultConfiguration.copy(
             host = host,
-            ssl = SSLConfiguration(mode = mode, rootCert = rootCert)
+            ssl = sslConfig
         )
         return withHandler(config, fn)
     }
@@ -44,7 +47,6 @@ open class DatabaseTestHelper {
         } finally {
             handleTimeout(handler) { handler.disconnect() }
         }
-
     }
 
     fun executeDdl(handler: Connection, data: String, count: Int = 0): Long {
@@ -65,7 +67,6 @@ open class DatabaseTestHelper {
         } catch (e: TimeoutException) {
 
             throw IllegalStateException("Timeout executing call from handler -> %s".format(handler))
-
         }
     }
 
@@ -95,6 +96,4 @@ open class DatabaseTestHelper {
             awaitFuture(handler.releasePreparedStatement(query))
         }
     }
-
-
 }

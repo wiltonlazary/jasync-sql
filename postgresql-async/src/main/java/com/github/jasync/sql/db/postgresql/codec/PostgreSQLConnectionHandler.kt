@@ -35,16 +35,11 @@ import io.netty.channel.ChannelOption
 import io.netty.channel.EventLoopGroup
 import io.netty.channel.SimpleChannelInboundHandler
 import io.netty.handler.codec.CodecException
-import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SslHandler
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import mu.KotlinLogging
-import java.io.FileInputStream
 import java.net.InetSocketAddress
-import java.security.KeyStore
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
-import javax.net.ssl.TrustManagerFactory
+import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
@@ -98,7 +93,6 @@ class PostgreSQLConnectionHandler(
         return this.connectionFuture
     }
 
-
     fun disconnect(): CompletableFuture<PostgreSQLConnectionHandler> {
         if (isConnected()) {
             this.currentContext!!.channel().writeAndFlush(CloseMessage).toCompletableFuture()
@@ -125,7 +119,7 @@ class PostgreSQLConnectionHandler(
     }
 
     @Suppress("RedundantUnitReturnType")
-    override fun channelActive(ctx: ChannelHandlerContext): Unit {
+    override fun channelActive(ctx: ChannelHandlerContext) {
         if (configuration.ssl.mode == SSLConfiguration.Mode.Disable)
             ctx.writeAndFlush(StartupMessage(this.properties))
         else
@@ -136,27 +130,10 @@ class PostgreSQLConnectionHandler(
         logger.trace { "got message $message" }
         when (message) {
             SSLResponseMessage(true) -> {
-                val ctxBuilder = SslContextBuilder.forClient()
-                if (configuration.ssl.mode >= SSLConfiguration.Mode.VerifyCA) {
-                    if (configuration.ssl.rootCert == null) {
-                        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-                        val ks = KeyStore.getInstance(KeyStore.getDefaultType())
-                        val cacerts = FileInputStream(System.getProperty("java.home") + "/lib/security/cacerts")
-                        cacerts.use { ks.load(it, "changeit".toCharArray()) }
-                        tmf.init(ks)
-                        ctxBuilder.trustManager(tmf)
-                    } else {
-                        ctxBuilder.trustManager(configuration.ssl.rootCert)
-                    }
-                } else {
-                    ctxBuilder.trustManager(InsecureTrustManagerFactory.INSTANCE)
-                }
-                val sslContext = ctxBuilder.build()
+                val sslContext = NettyUtils.createSslContext(configuration.ssl)
                 val sslEngine = sslContext.newEngine(ctx!!.alloc(), configuration.host, configuration.port)
-                if (configuration.ssl.mode >= SSLConfiguration.Mode.VerifyFull) {
-                    val sslParams = sslEngine.sslParameters
-                    sslParams.endpointIdentificationAlgorithm = "HTTPS"
-                    sslEngine.sslParameters = sslParams
+                if (configuration.ssl.mode == SSLConfiguration.Mode.VerifyFull) {
+                    NettyUtils.verifyHostIdentity(sslEngine)
                 }
                 val handler = SslHandler(sslEngine)
                 ctx.pipeline().addFirst(handler)
@@ -227,7 +204,6 @@ class PostgreSQLConnectionHandler(
                         connectionDelegate.onError(exception)
                     }
                 }
-
             }
             else -> {
                 logger.error("Unknown message type - $message")
@@ -247,7 +223,7 @@ class PostgreSQLConnectionHandler(
     }
 
     @Suppress("RedundantUnitReturnType")
-    override fun channelInactive(ctx: ChannelHandlerContext): Unit {
+    override fun channelInactive(ctx: ChannelHandlerContext) {
         logger.info("Connection disconnected - {}", ctx.channel().remoteAddress())
     }
 
@@ -260,5 +236,4 @@ class PostgreSQLConnectionHandler(
             connectionDelegate.onError(e)
         }
     }
-
 }

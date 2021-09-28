@@ -3,6 +3,7 @@ package com.github.jasync.sql.db.mysql.codec
 import com.github.jasync.sql.db.exceptions.BufferNotFullyConsumedException
 import com.github.jasync.sql.db.exceptions.NegativeMessageSizeException
 import com.github.jasync.sql.db.exceptions.ParserNotAvailableException
+import com.github.jasync.sql.db.mysql.decoder.AuthenticationSwitchRequestDecoder
 import com.github.jasync.sql.db.mysql.decoder.ColumnDefinitionDecoder
 import com.github.jasync.sql.db.mysql.decoder.ColumnProcessingFinishedDecoder
 import com.github.jasync.sql.db.mysql.decoder.EOFMessageDecoder
@@ -26,9 +27,9 @@ import com.github.jasync.sql.db.util.readBinaryLength
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageDecoder
-import mu.KotlinLogging
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicInteger
+import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
 
@@ -39,12 +40,14 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
     private val errorDecoder = ErrorDecoder(charset)
     private val okDecoder = OkDecoder(charset)
     private val columnDecoder = ColumnDefinitionDecoder(charset, DecoderRegistry(charset))
+    private val authenticationSwitchRequestDecoder = AuthenticationSwitchRequestDecoder(charset)
     private val rowDecoder = ResultSetRowDecoder()
     private val preparedStatementPrepareDecoder = PreparedStatementPrepareResponseDecoder()
 
     var processingColumns = false
     private var processingParams = false
     var isInQuery = false
+    private var processingRowData = false
     private var isPreparedStatementPrepare = false
     private var isPreparedStatementExecute = false
     private var isPreparedStatementExecuteRows = false
@@ -54,7 +57,7 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
     private var processedParams = 0L
     var totalColumns = 0L
     var processedColumns = 0L
-    private var expectedColDefMsgCount = 0L;
+    private var expectedColDefMsgCount = 0L
 
     private var hasReadColumnsCount = false
 
@@ -92,7 +95,6 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
             slice.markReaderIndex()
             slice.readByte()
 
-
             if (this.hasDoneHandshake) {
                 this.handleCommonFlow(messageType, slice, out)
             } else {
@@ -105,18 +107,18 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                 }
                 this.doDecoding(decoder, slice, out)
             }
-
         }
     }
 
     private fun handleCommonFlow(messageType: Byte, slice: ByteBuf, out: MutableList<Any>) {
+        // see this https://dev.mysql.com/doc/internals/en/com-query-response.html
+        logger.trace { "got message type $messageType" }
         val decoder = when (messageType.toInt()) {
             ServerMessage.Error -> {
                 this.clear()
                 this.errorDecoder
             }
             ServerMessage.EOF -> {
-
                 if (this.processingParams && this.totalParams > 0) {
                     this.processingParams = false
                     if (this.totalColumns == 0L) {
@@ -128,12 +130,13 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                     if (this.processingColumns) {
                         this.processingColumns = false
                         ColumnProcessingFinishedDecoder
+                    } else if (!isValidEOF(slice)) {
+                        authenticationSwitchRequestDecoder
                     } else {
                         this.clear()
                         EOFMessageDecoder
                     }
                 }
-
             }
             ServerMessage.Ok -> {
                 if (this.isPreparedStatementPrepare) {
@@ -144,15 +147,17 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                     } else {
                         // workaround for MemSQL ColDef messages being exactly 19 bytes, all ZEROS.
                         slice.resetReaderIndex()
-                        expectedColDefMsgCount--;
+                        expectedColDefMsgCount--
                         this.columnDecoder
                     }
                 } else {
-                    if (this.isPreparedStatementExecuteRows) {
-                        null
-                    } else {
-                        this.clear()
-                        this.okDecoder
+                    when {
+                        this.isPreparedStatementExecuteRows -> null
+                        this.processingRowData -> null
+                        else -> {
+                            this.clear()
+                            this.okDecoder
+                        }
                     }
                 }
             }
@@ -162,11 +167,15 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                 } else {
                     throw ParserNotAvailableException(messageType)
                 }
-
             }
         }
 
         doDecoding(decoder, slice, out)
+    }
+
+    private fun isValidEOF(slice: ByteBuf): Boolean {
+        // see https://dev.mysql.com/doc/internals/en/packet-EOF_Packet.html
+        return slice.readableBytes() == 4
     }
 
     private fun doDecoding(decoder: MessageDecoder?, slice: ByteBuf, out: MutableList<Any>) {
@@ -188,12 +197,13 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                     this.hasReadColumnsCount = true
                     this.totalColumns = result.columnsCount.toLong()
                     this.totalParams = result.paramsCount.toLong()
-                    this.expectedColDefMsgCount = this.totalColumns +  this.totalParams;
+                    this.expectedColDefMsgCount = this.totalColumns + this.totalParams
                 }
                 is ParamAndColumnProcessingFinishedMessage -> {
                     this.clear()
                 }
                 is ColumnProcessingFinishedMessage -> {
+                    this.processingRowData = true
                     when {
                         this.isPreparedStatementPrepare -> this.clear()
                         this.isPreparedStatementExecute -> this.isPreparedStatementExecuteRows = true
@@ -218,7 +228,6 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
                 }
                 else -> out.add(result)
             }
-
         }
     }
 
@@ -234,7 +243,6 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
             return this.columnDecoder.decode(slice)
         }
 
-
         return if (this.totalColumns == this.processedColumns) {
             if (this.isPreparedStatementExecute) {
                 val row = slice.readRetainedSlice(slice.readableBytes())
@@ -247,7 +255,6 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
             this.processedColumns += 1
             this.columnDecoder.decode(slice)
         }
-
     }
 
     fun preparedStatementPrepareStarted() {
@@ -277,6 +284,7 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
         this.isPreparedStatementPrepare = false
         this.isPreparedStatementExecute = false
         this.isPreparedStatementExecuteRows = false
+        this.processingRowData = false
         this.isInQuery = false
         this.processingColumns = false
         this.processingParams = false
@@ -287,5 +295,4 @@ class MySQLFrameDecoder(val charset: Charset, private val connectionId: String) 
         this.hasReadColumnsCount = false
         this.expectedColDefMsgCount = 0
     }
-
 }

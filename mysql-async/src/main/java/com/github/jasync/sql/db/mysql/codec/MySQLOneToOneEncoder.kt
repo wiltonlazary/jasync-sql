@@ -9,6 +9,7 @@ import com.github.jasync.sql.db.mysql.encoder.PreparedStatementExecuteEncoder
 import com.github.jasync.sql.db.mysql.encoder.PreparedStatementPrepareEncoder
 import com.github.jasync.sql.db.mysql.encoder.QueryMessageEncoder
 import com.github.jasync.sql.db.mysql.encoder.QuitMessageEncoder
+import com.github.jasync.sql.db.mysql.encoder.SSLRequestEncoder
 import com.github.jasync.sql.db.mysql.message.client.ClientMessage
 import com.github.jasync.sql.db.mysql.util.CharsetMapper
 import com.github.jasync.sql.db.util.BufferDumper
@@ -16,15 +17,14 @@ import com.github.jasync.sql.db.util.ByteBufferUtils
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageEncoder
-import mu.KotlinLogging
 import java.nio.charset.Charset
-
+import mu.KotlinLogging
 
 class MySQLOneToOneEncoder(charset: Charset, charsetMapper: CharsetMapper) :
     MessageToMessageEncoder<ClientMessage>(ClientMessage::class.java) {
 
-
-    private val handshakeResponseEncoder = HandshakeResponseEncoder(charset, charsetMapper)
+    private val sslRequestEncoder = SSLRequestEncoder(charset, charsetMapper)
+    private val handshakeResponseEncoder = HandshakeResponseEncoder(charset, sslRequestEncoder)
     private val queryEncoder = QueryMessageEncoder(charset)
     private val rowEncoder = BinaryRowEncoder(charset)
     private val prepareEncoder = PreparedStatementPrepareEncoder(charset)
@@ -33,10 +33,10 @@ class MySQLOneToOneEncoder(charset: Charset, charsetMapper: CharsetMapper) :
 
     private var sequence = 1
 
-    @Suppress("RedundantUnitReturnType")
-    override fun encode(ctx: ChannelHandlerContext, message: ClientMessage, out: MutableList<Any>): Unit {
+    override fun encode(ctx: ChannelHandlerContext, message: ClientMessage, out: MutableList<Any>) {
         val encoder = when (message.kind) {
             ClientMessage.ClientProtocolVersion -> this.handshakeResponseEncoder
+            ClientMessage.SslRequest -> this.sslRequestEncoder
             ClientMessage.Quit -> {
                 sequence = 0
                 QuitMessageEncoder
@@ -76,7 +76,6 @@ class MySQLOneToOneEncoder(charset: Charset, charsetMapper: CharsetMapper) :
 
         out.add(result)
     }
-
 }
 
 private val logger = KotlinLogging.logger {}

@@ -7,14 +7,12 @@ import io.netty.buffer.Unpooled
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-
 class ParserKSpec {
 
     val parser = BackendKeyDataParser
 
-
     @Test
-    fun `"parserk" should" correctly parse the message"`() {
+    fun `parserk should correctly parse the message`() {
 
         val buffer = Unpooled.buffer()
         buffer.writeInt(10)
@@ -25,8 +23,5 @@ class ParserKSpec {
         assertThat(data.kind).isEqualTo(ServerMessage.BackendKeyData)
         assertThat(data.processId).isEqualTo(10)
         assertThat(data.secretKey).isEqualTo(20)
-
     }
-
 }
-

@@ -11,19 +11,19 @@ import com.github.jasync.sql.db.pool.PoolConfiguration
 import com.github.jasync.sql.db.pool.PoolExhaustedException
 import com.github.jasync.sql.db.postgresql.PostgreSQLConnection
 import com.github.jasync.sql.db.postgresql.pool.PostgreSQLConnectionFactory
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.matches
 import org.awaitility.kotlin.untilCallTo
 import org.junit.Test
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
 
 class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
 
     @Test
-    fun `"pool" should "give me a valid object when I ask for one"`() {
+    fun `pool should give me a valid object when I ask for one`() {
 
         withPool { pool ->
             val connection = get(pool)
@@ -34,7 +34,7 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
     }
 
     @Test
-    fun `"pool" should "enqueue an action if the pool is full" `() {
+    fun `pool should enqueue an action if the pool is full`() {
 
         withPool(1, 3) { pool ->
 
@@ -71,13 +71,11 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
             await.untilCallTo { pool.availableItems.size } matches { it == 1 }
             assertThat(pool.usedItems.size).isEqualTo(0)
             assertThat(pool.waitingForItem.size).isEqualTo(0)
-
         }
-
     }
 
     @Test
-    fun `"pool" should "exhaust the pool"`() {
+    fun `pool should exhaust the pool`() {
 
         withPool(1, 1) { pool ->
             (1..2).forEach { _ ->
@@ -87,11 +85,10 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
                 awaitFuture(pool.take())
             }
         }
-
     }
 
     @Test
-    fun `"pool" should "it should remove idle connections once the time limit has been reached" `() {
+    fun `pool should it should remove idle connections once the time limit has been reached`() {
 
         withPool(validationInterval = 1000) { pool ->
             val connections = (1..5).map { _ ->
@@ -108,11 +105,10 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
 
             await.untilCallTo { pool.availableItems } matches { it.isNullOrEmpty() }
         }
-
     }
 
     @Test
-    fun `"pool" should "it should remove aged out connections once the time limit has been reached" `() {
+    fun `pool should it should remove aged out connections once the time limit has been reached`() {
 
         withPool(validationInterval = 1000, maxTtl = 1000) { pool ->
             val connections = (1..5).map { _ ->
@@ -126,14 +122,12 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
 
             await.untilCallTo { pool.availableItems.size } matches { it == 5 }
 
-
             await.untilCallTo { pool.availableItems } matches { it.isNullOrEmpty() }
         }
-
     }
 
     @Test
-    fun `"pool" should "it should validate returned connections before sending them back to the pool" `() {
+    fun `pool should it should validate returned connections before sending them back to the pool`() {
 
         withPool { pool ->
             val connection = get(pool)
@@ -148,11 +142,10 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
             assertThat(pool.availableItems.size).isEqualTo(0)
             assertThat(pool.usedItems.size).isEqualTo(0)
         }
-
     }
 
     @Test
-    fun `"pool" should "it should not accept returned connections that aren't ready for query" `() {
+    fun `pool should it should not accept returned connections that aren't ready for query`() {
 
         withPool { pool ->
             val connection = get(pool)
@@ -164,15 +157,13 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
             await.untilCallTo { pool.availableItems.size } matches { it == 0 }
             await.untilCallTo { pool.usedItems.size } matches { it == 0 }
         }
-
     }
-
 
     private fun <T> withPool(
         maxObjects: Int = 5,
         maxQueueSize: Int = 5,
         validationInterval: Long = 3000,
-        //maxIdle: Long = 1000,
+        // maxIdle: Long = 1000,
         maxTtl: Long = -1,
         fn: (ActorBasedObjectPool<PostgreSQLConnection>) -> T
     ): T {
@@ -191,7 +182,6 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
         } finally {
             pool.close().get()
         }
-
     }
 
     private fun executeTest(connection: PostgreSQLConnection) =
@@ -201,5 +191,4 @@ class ActorAsyncObjectPoolSpec : DatabaseTestHelper() {
         val future = pool.take()
         return future.get(5, TimeUnit.SECONDS)
     }
-
 }

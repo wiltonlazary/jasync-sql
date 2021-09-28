@@ -21,10 +21,9 @@ class AuthenticationSwitchResponseEncoder(val charset: Charset) : MessageEncoder
         val buffer = ByteBufferUtils.packetBuffer()
 
         val bytes =
-            authenticator.generateAuthentication(charset, switch.password, switch.request.seed.toByteArray(charset))
+            authenticator.generateAuthentication(charset, switch.password, switch.request.seed)
         buffer.writeBytes(bytes)
 
         return buffer
     }
-
 }

@@ -3,9 +3,9 @@ package com.github.aysnc.sql.db.integration
 import com.github.jasync.sql.db.column.InetAddressEncoderDecoder
 import com.github.jasync.sql.db.column.TimestampWithTimezoneEncoderDecoder
 import com.github.jasync.sql.db.invoke
+import java.time.OffsetDateTime
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-
 
 class ArrayTypesSpec : DatabaseTestHelper() {
     // `uniq` allows sbt to run the tests concurrently as there is no CREATE TEMP TYPE
@@ -44,9 +44,8 @@ class ArrayTypesSpec : DatabaseTestHelper() {
                                                  (smallint_column, text_column, inet_column, direction_column, endpoint_column, timestamp_column)
                                                  values (?,?,?,?,?,?)"""
 
-
     @Test
-    fun `"connection" should "correctly parse the array type"`() {
+    fun `connection should correctly parse the array type`() {
 
         withHandler { handler ->
             try {
@@ -63,21 +62,26 @@ class ArrayTypesSpec : DatabaseTestHelper() {
                         null
                     )
                 )
-                assertThat(result[0]("timestamp_column")).isEqualTo(
-                    listOf(
-                        TimestampWithTimezoneEncoderDecoder.decode("2013-04-06 01:15:10.528-03"),
-                        TimestampWithTimezoneEncoderDecoder.decode("2013-04-06 01:15:08.528-03")
+                val times = result[0]("timestamp_column") as List<*>
+
+                assertThat(
+                    (times[0] as OffsetDateTime).isEqual(
+                        TimestampWithTimezoneEncoderDecoder.decode("2013-04-06 01:15:10.528-03") as OffsetDateTime
+                    )
+                )
+                assertThat(
+                    (times[1] as OffsetDateTime).isEqual(
+                        TimestampWithTimezoneEncoderDecoder.decode("2013-04-06 01:15:08.528-03") as OffsetDateTime
                     )
                 )
             } finally {
                 executeDdl(handler, simpleDrop("cptat"))
             }
         }
-
     }
 
     @Test
-    fun `"connection" should "correctly send arrays using prepared statements"`() {
+    fun `connection should correctly send arrays using prepared statements`() {
 
         val timestamps = listOf(
             TimestampWithTimezoneEncoderDecoder.decode("2013-04-06 01:15:10.528-03"),
@@ -89,8 +93,8 @@ class ArrayTypesSpec : DatabaseTestHelper() {
         )
         val directions = listOf("in", "out")
         val endpoints = listOf(
-            ("127.0.0.1" to 80),  // data class
-            ("2002:15::1" to 443)  // tuple
+            ("127.0.0.1" to 80), // data class
+            ("2002:15::1" to 443) // tuple
         )
         val numbers = listOf(1, 2, 3, 4)
         val texts =
@@ -110,15 +114,15 @@ class ArrayTypesSpec : DatabaseTestHelper() {
                 assertThat(result[0]("smallint_column")).isEqualTo(numbers)
                 assertThat(result[0]("text_column")).isEqualTo(texts)
                 assertThat(result[0]("inet_column")).isEqualTo(inets)
-                assertThat(result[0]("direction_column")).isEqualTo("{in,out}")                           // user type decoding not supported)
+                assertThat(result[0]("direction_column")).isEqualTo("{in,out}") // user type decoding not supported)
                 assertThat(result[0]("endpoint_column")).isEqualTo("""{"(127.0.0.1,80)","(2002:15::1,443)"}""") // user type decoding not supported)
-                assertThat(result[0]("timestamp_column")).isEqualTo(timestamps)
+
+                val times = result[0]("timestamp_column") as List<*>
+                assertThat((times[0] as OffsetDateTime).isEqual(timestamps[0] as OffsetDateTime))
+                assertThat((times[1] as OffsetDateTime).isEqual(timestamps[1] as OffsetDateTime))
             } finally {
                 executeDdl(handler, simpleDrop("csaups"))
             }
         }
-
     }
-
-
 }

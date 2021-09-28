@@ -1,6 +1,6 @@
 <img width="550" alt="jasync-sql" src="resources/jas.png" style="max-width:100%;"> 
 
-[![Chat at https://gitter.im/jasync-sql/support](https://badges.gitter.im//jasync-sql/support.svg)](https://gitter.im//jasync-sql/support) [ ![Download](https://api.bintray.com/packages/jasync-sql/jasync-sql/jasync-sql/images/download.svg) ](https://bintray.com/jasync-sql/jasync-sql/jasync-sql/_latestVersion) [![Maven Central](https://img.shields.io/maven-central/v/com.github.jasync-sql/jasync-common.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.github.jasync-sql%22%20AND%20a:%22jasync-common%22) [![Build Status](https://travis-ci.org/jasync-sql/jasync-sql.svg?branch=master)](https://travis-ci.org/jasync-sql/jasync-sql) [![Apache License V.2](https://img.shields.io/badge/license-Apache%20V.2-blue.svg)](https://github.com/jasync-sql/jasync-sql/blob/master/LICENSE) [![codecov](https://codecov.io/gh/jasync-sql/jasync-sql/branch/master/graph/badge.svg)](https://codecov.io/gh/jasync-sql/jasync-sql) [![Awesome Kotlin Badge](https://kotlin.link/awesome-kotlin.svg)](https://github.com/KotlinBy/awesome-kotlin#libraries-frameworks-database)
+[![Chat at https://gitter.im/jasync-sql/support](https://badges.gitter.im//jasync-sql/support.svg)](https://gitter.im//jasync-sql/support) [![Maven Central](https://img.shields.io/maven-central/v/com.github.jasync-sql/jasync-common.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.github.jasync-sql%22%20AND%20a:%22jasync-common%22) [![Build Status](https://travis-ci.com/jasync-sql/jasync-sql.svg?branch=master)](https://travis-ci.com/jasync-sql/jasync-sql) [![Apache License V.2](https://img.shields.io/badge/license-Apache%20V.2-blue.svg)](https://github.com/jasync-sql/jasync-sql/blob/master/LICENSE) [![codecov](https://codecov.io/gh/jasync-sql/jasync-sql/branch/master/graph/badge.svg)](https://codecov.io/gh/jasync-sql/jasync-sql) [![Awesome Kotlin Badge](https://kotlin.link/awesome-kotlin.svg)](https://github.com/KotlinBy/awesome-kotlin#libraries-frameworks-database)
 
 
 [jasync-sql](https://github.com/jasync-sql/jasync-sql) is a Simple, Netty based, asynchronous, performant and reliable database drivers for
@@ -41,13 +41,13 @@ For docs and info see the [wiki](https://github.com/jasync-sql/jasync-sql/wiki).
 <dependency>
   <groupId>com.github.jasync-sql</groupId>
   <artifactId>jasync-mysql</artifactId>
-  <version>1.0.7</version>
+  <version>2.0.0</version>
 </dependency>
 <!-- postgresql -->
 <dependency>
   <groupId>com.github.jasync-sql</groupId>
   <artifactId>jasync-postgresql</artifactId>
-  <version>1.0.7</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
@@ -56,9 +56,9 @@ For docs and info see the [wiki](https://github.com/jasync-sql/jasync-sql/wiki).
 ```gradle
 dependencies {
   // mysql
-  compile 'com.github.jasync-sql:jasync-mysql:1.0.7'
+  compile 'com.github.jasync-sql:jasync-mysql:2.0.0'
   // postgresql
-  compile 'com.github.jasync-sql:jasync-postgresql:1.0.7'
+  compile 'com.github.jasync-sql:jasync-postgresql:2.0.0'
 }
 ```
 
@@ -67,15 +67,18 @@ dependencies {
 This project is a port of [mauricio/postgresql-async](https://github.com/mauricio/postgresql-async) to Kotlin.  
 Why? Because the original lib is not maintained anymore, We use it in [ob1k](https://github.com/outbrain/ob1k), and would like to remove the Scala dependency in ob1k.
 
-This project always returns [JodaTime](http://joda-time.sourceforge.net/) when dealing with date types and not the
-`java.util.Date` class. (We plan to move to jdk-8 dates).
-
 If you want information specific to the drivers, check the [PostgreSQL README](postgresql-async/README.md) and the
 [MySQL README](mysql-async/README.md).
 
 You can view the project's change log [here](CHANGELOG.md).
 
 **Follow us on twitter: [@jasyncs](https://twitter.com/Jasyncs).**
+
+#### DateTime:
+Version 1.x always returns [JodaTime](http://joda-time.sourceforge.net/) when dealing with date types and not the
+`java.util.Date` class nor jdk-8 dates.  
+Version 2.x works with java 8 DateTime objects (`java.time.LocalDateTime` and such).  
+This [post](https://blog.joda.org/2014/11/converting-from-joda-time-to-javatime.html) can help with migration.
 
 ## Who is using it
 
@@ -85,9 +88,11 @@ You can view the project's change log [here](CHANGELOG.md).
 * [micronaut](https://github.com/micronaut-projects/micronaut-sql)
 * [Outbrain/ob1k-db](https://github.com/outbrain/ob1k/)
 * https://github.com/humb1t/jpom
-* [Zeko Data Mapper](https://github.com/darkredz/Zeko-Data-Mapper)
+* [Zeko Data Mapper](https://github.com/darkredz/Zeko-Data-Mapper) and [Zeko SQL Builder](https://github.com/darkredz/Zeko-SQL-Builder)
 * [vertx-jooq async module](https://github.com/jklingsporn/vertx-jooq)
 * [ScalikeJDBC Async](https://github.com/scalikejdbc/scalikejdbc-async)
+* [Quill](https://getquill.io/)
+* [Jasync SQL Extensions](https://github.com/28Smiles/jasync-sql-extensions)
 
 Add your name here!
 
@@ -98,6 +103,10 @@ Is it used in production on large scale?
 The graph above is from only couple of services using it. Y-Axis is # of queries per minute.
 
 There is also a [TechEmpower test](https://github.com/TechEmpower/FrameworkBenchmarks/pull/4247) using `ktor` and `jasync-sql`.
+
+[Zeko SQL Builder](https://github.com/darkredz/Zeko-SQL-Builder#performance) compared jasync to hikary and vertex:  
+<img width="550" alt="jasync-sql-zeko" src="https://github.com/darkredz/Zeko-SQL-Builder/blob/master/zeko-sql-builder-benchmark.jpeg" style="max-width:100%;"> 
+
 
 ## Support
 

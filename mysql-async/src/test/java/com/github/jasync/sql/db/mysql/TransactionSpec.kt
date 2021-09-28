@@ -5,10 +5,10 @@ import com.github.jasync.sql.db.mysql.exceptions.MySQLException
 import com.github.jasync.sql.db.util.ExecutorServiceUtils
 import com.github.jasync.sql.db.util.flatMapAsync
 import com.github.jasync.sql.db.util.mapAsync
+import java.util.UUID
+import java.util.concurrent.ExecutionException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
-import java.util.*
-import java.util.concurrent.ExecutionException
 
 val BrokenInsert = """INSERT INTO users (id, name) VALUES (1, 'Maurício Aragão')"""
 val TransactionInsert = "insert into transaction_test (id) values (?)"
@@ -16,7 +16,7 @@ val TransactionInsert = "insert into transaction_test (id) values (?)"
 class TransactionSpec : ConnectionHelper() {
 
     @Test
-    fun `"connection in transaction" should "correctly store the values of the transaction"`() {
+    fun `connection in transaction should correctly store the values of the transaction`() {
         withConnection { connection ->
             executeQuery(connection, this.createTable)
 
@@ -44,7 +44,7 @@ class TransactionSpec : ConnectionHelper() {
             body()
             throw Exception("${exType.simpleName}->${causeType?.simpleName} was not thrown")
         } catch (e: Exception) {
-            //e.printStackTrace()
+            // e.printStackTrace()
             assertThat(e::class.java).isEqualTo(exType)
             causeType?.let { assertThat(e.cause!!::class.java).isEqualTo(it) }
             return e.cause ?: e
@@ -52,7 +52,7 @@ class TransactionSpec : ConnectionHelper() {
     }
 
     @Test
-    fun `"connection in transaction" should "correctly rollback changes if the transaction raises an exception"`() {
+    fun `connection in transaction should correctly rollback changes if the transaction raises an exception`() {
 
         withConnection { connection ->
             executeQuery(connection, this.createTable)
@@ -74,12 +74,10 @@ class TransactionSpec : ConnectionHelper() {
             assertThat(result.size).isEqualTo(1)
             assertThat(result[0]("name")).isEqualTo("Boogie Man")
         }
-
     }
 
     @Test
-    fun `"connection in transaction" should "should make a connection invalid and not return it to the pool if it raises an exception"`() {
-
+    fun `connection in transaction should should make a connection invalid and not return it to the pool if it raises an exception`() {
 
         withPool { pool ->
 
@@ -95,14 +93,12 @@ class TransactionSpec : ConnectionHelper() {
             } as MySQLException
 
             assertThat(pool.idleConnectionsCount).isEqualTo(0)
-            //pool.availables must not contain (connection.asInstanceOf[MySQLConnection])
-
+            // pool.availables must not contain (connection.asInstanceOf[MySQLConnection])
         }
-
     }
 
     @Test
-    fun `"connection in transaction" should "runs commands for a transaction in a single connection"`() {
+    fun `connection in transaction should runs commands for a transaction in a single connection`() {
 
         val id = UUID.randomUUID().toString()
 
@@ -124,10 +120,16 @@ class TransactionSpec : ConnectionHelper() {
             assertThat(e.errorMessage.errorCode).isEqualTo(1062)
             val rows = executePreparedStatement(pool, "select * from transaction_test where id = ?", listOf(id)).rows
             assertThat(rows).isEmpty()
-
         }
-
     }
 
+    @Test
+    fun `check auto-commit and in transaction flag`() {
 
+        withConnection { connection ->
+            assertThat(connection.isAutoCommit()).isTrue()
+            awaitFuture(connection.sendQuery("SET AUTOCOMMIT=0"))
+            assertThat(connection.isAutoCommit()).isFalse()
+        }
+    }
 }
