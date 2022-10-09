@@ -1,10 +1,11 @@
-package com.github.jasync.sql.db.mysql
+package com.github.jasync.r2dbc.mysql.integ
 
 import com.github.jasync.sql.db.Configuration
 import com.github.jasync.sql.db.Connection
 import com.github.jasync.sql.db.ConnectionPoolConfiguration
 import com.github.jasync.sql.db.QueryResult
 import com.github.jasync.sql.db.SSLConfiguration
+import com.github.jasync.sql.db.mysql.MySQLConnection
 import com.github.jasync.sql.db.mysql.pool.MySQLConnectionFactory
 import com.github.jasync.sql.db.pool.ConnectionPool
 import java.util.concurrent.CompletableFuture
@@ -14,7 +15,7 @@ import java.util.concurrent.TimeUnit
  *
  * @author Doug Chimento dchimento@outbrain.com
  */
-open class ConnectionHelper : ContainerHelper() {
+open class R2dbcConnectionHelper : R2dbcContainerHelper() {
 
     val createTableNumericColumns =
         """
@@ -86,7 +87,7 @@ open class ConnectionHelper : ContainerHelper() {
     val select = """SELECT * FROM users"""
 
     fun getConfiguration(): Configuration {
-        return ContainerHelper.defaultConfiguration
+        return R2dbcContainerHelper.defaultConfiguration
     }
 
     fun <T> awaitFuture(f: CompletableFuture<T>): T {
@@ -94,7 +95,7 @@ open class ConnectionHelper : ContainerHelper() {
     }
 
     fun <T> withPool(f: (ConnectionPool<MySQLConnection>) -> T): T {
-        return withConfigurablePool(ContainerHelper.defaultConfiguration, f)
+        return withConfigurablePool(R2dbcContainerHelper.defaultConfiguration, f)
     }
 
     fun <T> withConfigurablePool(configuration: Configuration, f: (ConnectionPool<MySQLConnection>) -> T): T {
@@ -126,7 +127,7 @@ open class ConnectionHelper : ContainerHelper() {
     }
 
     fun <T> withConnection(fn: (MySQLConnection) -> T): T {
-        return withConfigurableConnection(ContainerHelper.defaultConfiguration, fn)
+        return withConfigurableConnection(R2dbcContainerHelper.defaultConfiguration, fn)
     }
 
     fun <T> withSSLConnection(
